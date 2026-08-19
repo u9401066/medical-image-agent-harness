@@ -12,10 +12,14 @@ import pytest
 from medical_image_harness.models import (
     AnalysisResult,
     ChecklistItem,
+    Evidence,
     Finding,
     Modality,
+    Observation,
+    Polarity,
     RegionRect,
     Severity,
+    VerificationStatus,
 )
 from medical_image_harness.multipass import (
     MultiPassAnalyzer,
@@ -30,6 +34,7 @@ from medical_image_harness.multipass import (
     expand_crop_to_min_source_edge,
     needs_manual_zoom,
     pad_region,
+    reconcile_final_report,
     region_source_edge_px,
     remap_bbox,
     select_ekg_systematic_probe_regions,
@@ -100,6 +105,49 @@ def _ekg_row_layout_result(findings: list[Finding]) -> AnalysisResult:
         ],
     }
     return result
+
+
+def test_final_reconciliation_preserves_host_bound_scientific_ledger() -> None:
+    box = RegionRect(0.1, 0.2, 0.3, 0.1)
+    draft = _result([_finding("f1", Severity.WARNING, box)])
+    draft.assessment_scope = "single_image_observation"
+    draft.summary_observation_ids = ["obs-1"]
+    draft.observations = [
+        Observation(
+            id="obs-1",
+            anatomy="right lower lung",
+            finding="focal opacity",
+            polarity=Polarity.PRESENT,
+            status=VerificationStatus.SUPPORTED,
+            assessable=True,
+            evidence_ids=["ev-1"],
+        )
+    ]
+    draft.evidence = [
+        Evidence(
+            id="ev-1",
+            kind="source_image",
+            source_image_sha256="a" * 64,
+            description="visible focal opacity",
+            bboxes=[box],
+        )
+    ]
+    draft.input_provenance = {"source_image_sha256": "a" * 64}
+    draft.study_manifest = {"id": "study-1"}
+    draft.workflow_events = [{"stage": "intake", "status": "completed"}]
+    final = _result([])
+    final.summary = "Reconciled narrative"
+
+    result = reconcile_final_report(draft, final)
+
+    assert result.summary == "Reconciled narrative"
+    assert result.assessment_scope == "single_image_observation"
+    assert result.summary_observation_ids == ["obs-1"]
+    assert result.observations == draft.observations
+    assert result.evidence == draft.evidence
+    assert result.input_provenance == draft.input_provenance
+    assert result.study_manifest == draft.study_manifest
+    assert result.workflow_events == draft.workflow_events
 
 
 # ── clamp_unit ───────────────────────────────────────────────────────

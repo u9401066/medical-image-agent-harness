@@ -781,9 +781,18 @@ def reconcile_final_report(
 
     return dataclasses.replace(
         final,
+        schema_version=draft.schema_version,
+        protocol_version=draft.protocol_version,
         modality=draft.modality,
+        assessment_scope=draft.assessment_scope,
+        result_status=draft.result_status,
         summary=final.summary.strip() or draft.summary,
+        summary_observation_ids=list(draft.summary_observation_ids),
         severity=draft.severity,
+        observations=list(draft.observations),
+        evidence=list(draft.evidence),
+        input_provenance=draft.input_provenance,
+        study_manifest=draft.study_manifest,
         findings=list(draft.findings),
         checklist=final.checklist or draft.checklist,
         analysis_time_ms=draft.analysis_time_ms + final.analysis_time_ms,
@@ -803,6 +812,7 @@ def reconcile_final_report(
         review_required=draft.review_required or final.review_required,
         review_reasons=unique(draft.review_reasons, final.review_reasons),
         layout=dict(draft.layout),
+        workflow_events=list(draft.workflow_events),
         analysis_trace=list(draft.analysis_trace),
     )
 
