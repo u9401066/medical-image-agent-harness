@@ -696,6 +696,9 @@ def apply_refinement_delta(
             mapped,
             id=_unique_finding_id(findings, mapped.id),
             notes=_append_rationale(mapped.notes, delta.rationale),
+            evidence=[],
+            evidence_ids=[],
+            observation_ids=[],
         )
         return [*findings, mapped]
 
@@ -728,6 +731,9 @@ def apply_refinement_delta(
                     bboxes=mapped.bboxes or current.bboxes,
                     regions=mapped.regions or current.regions,
                     notes=notes,
+                    evidence=[],
+                    evidence_ids=[],
+                    observation_ids=[],
                 )
             )
         else:
@@ -740,6 +746,9 @@ def apply_refinement_delta(
                     bboxes=mapped.bboxes or current.bboxes,
                     regions=mapped.regions or current.regions,
                     notes=notes,
+                    evidence=[],
+                    evidence_ids=[],
+                    observation_ids=[],
                 )
             )
     return result

@@ -7,6 +7,8 @@ that a zoom crop only ever shrinks the captured region.
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 
 from medical_image_harness.models import (
@@ -402,6 +404,48 @@ class TestRefinementDeltaContract:
         assert bbox.y + bbox.h <= crop.y + crop.h
         assert bbox.x + bbox.w <= 1.0
         assert bbox.y + bbox.h <= 1.0
+
+    def test_refinement_changes_clear_unreconciled_canonical_links(self):
+        crop = RegionRect(0.1, 0.1, 0.5, 0.5)
+        linked = replace(
+            _finding("f1", Severity.WARNING, RegionRect(0.2, 0.2, 0.2, 0.2)),
+            evidence=["legacy evidence"],
+            evidence_ids=["ev-1"],
+            observation_ids=["obs-1"],
+        )
+        revised = _finding(
+            "f1",
+            Severity.CRITICAL,
+            RegionRect(0.3, 0.3, 0.1, 0.1),
+        )
+        added = replace(
+            _finding("f2", Severity.WARNING, RegionRect(0.1, 0.1, 0.1, 0.1)),
+            evidence_ids=["invented-ev"],
+            observation_ids=["invented-obs"],
+        )
+
+        after_revise = apply_refinement_delta(
+            [linked],
+            RefinementDelta(
+                RefinementAction.REVISE,
+                target_id="f1",
+                finding=revised,
+            ),
+            crop_region=crop,
+            expected_target_id="f1",
+        )
+        after_add = apply_refinement_delta(
+            after_revise,
+            RefinementDelta(RefinementAction.ADD, finding=added),
+            crop_region=crop,
+            expected_target_id=None,
+        )
+
+        assert after_revise[0].evidence == []
+        assert after_revise[0].evidence_ids == []
+        assert after_revise[0].observation_ids == []
+        assert after_add[1].evidence_ids == []
+        assert after_add[1].observation_ids == []
 
 
 # ── MultiPassInterpreter orchestration ───────────────────────────────

@@ -11,6 +11,7 @@ from medical_image_harness.models import (
     Polarity,
     RegionRect,
     Severity,
+    UserRegionAnnotation,
     VerificationStatus,
 )
 from medical_image_harness.profiles import (
@@ -32,6 +33,7 @@ __all__ = [
     "Polarity",
     "RegionRect",
     "Severity",
+    "UserRegionAnnotation",
     "VerificationStatus",
     "default_registry",
 ]

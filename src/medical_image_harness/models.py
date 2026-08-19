@@ -157,15 +157,6 @@ class AnalysisResult:
     severity: Severity
     findings: list[Finding]
     checklist: dict[str, ChecklistItem]
-    schema_version: str = "1.0.0"
-    protocol_version: str = "0.1.0"
-    assessment_scope: str = ""
-    result_status: str = "research_draft"
-    summary_observation_ids: list[str] = field(default_factory=list)
-    observations: list[Observation] = field(default_factory=list)
-    evidence: list[Evidence] = field(default_factory=list)
-    input_provenance: InputProvenance | dict[str, object] | None = None
-    study_manifest: StudyManifest | dict[str, object] | None = None
     analysis_time_ms: int = 0
     model_used: str = ""
     image_quality: str | dict[str, object] = ""
@@ -177,8 +168,17 @@ class AnalysisResult:
     review_required: bool = False
     review_reasons: list[str] = field(default_factory=list)
     layout: dict = field(default_factory=dict)
-    workflow_events: list[dict[str, object]] = field(default_factory=list)
     analysis_trace: list[dict[str, object]] = field(default_factory=list)
+    schema_version: str = "1.0.0"
+    protocol_version: str = "0.1.0"
+    assessment_scope: str = ""
+    result_status: str = "research_draft"
+    summary_observation_ids: list[str] = field(default_factory=list)
+    observations: list[Observation] = field(default_factory=list)
+    evidence: list[Evidence] = field(default_factory=list)
+    input_provenance: InputProvenance | dict[str, object] | None = None
+    study_manifest: StudyManifest | dict[str, object] | None = None
+    workflow_events: list[dict[str, object]] = field(default_factory=list)
 
     def to_contract_payload(self, *, validate: bool = True) -> dict[str, object]:
         """Build the exact public JSON contract, optionally validating it."""

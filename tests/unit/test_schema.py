@@ -516,6 +516,22 @@ def test_incomplete_typed_draft_cannot_masquerade_as_canonical_result() -> None:
         result.to_contract_payload()
 
 
+def test_analysis_result_preserves_legacy_positional_field_order() -> None:
+    result = AnalysisResult(
+        Modality.CXR,
+        "summary",
+        Severity.NORMAL,
+        [],
+        {},
+        123,
+        "legacy-model",
+    )
+
+    assert result.analysis_time_ms == 123
+    assert result.model_used == "legacy-model"
+    assert result.schema_version == "1.0.0"
+
+
 @pytest.mark.parametrize(
     "payload",
     [
