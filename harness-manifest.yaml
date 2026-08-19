@@ -1,0 +1,27 @@
+harness_id: medical-image-agent-harness
+protocol_version: 0.1.0
+schema_version: 1.0.0
+canonical_skill: .agents/skills/medical-image-reading/SKILL.md
+result_schema: schemas/analysis-result.schema.json
+supported_agent_surfaces:
+  - codex
+  - github-copilot
+modalities:
+  - EKG
+  - CXR
+  - CT_BRAIN
+mandatory_invariants:
+  - DEIDENTIFIED_INPUT_ONLY
+  - QUALITY_GATE_BEFORE_INFERENCE
+  - BLIND_PASS_BEFORE_OPTIONAL_TOOLS
+  - ATOMIC_OBSERVATION_LEDGER
+  - SOURCE_BOUND_LOCALIZATION
+  - EXPLICIT_HYPOTHESIS_CHALLENGE
+  - APPROPRIATE_ABSTENTION
+  - AUTHORIZED_HUMAN_REVIEW
+forbidden_capabilities:
+  - screen_capture
+  - ui_overlay
+  - pacs_writeback
+  - ehr_writeback
+  - proprietary_model_credentials

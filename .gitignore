@@ -1,0 +1,22 @@
+.venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+__pycache__/
+*.py[cod]
+.DS_Store
+
+# Never commit source medical data, runtime state, or model artifacts.
+data/
+datasets/
+models/
+checkpoints/
+*.dcm
+*.sqlite
+*.db
+*.pem
+*.key

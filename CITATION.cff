@@ -1,0 +1,11 @@
+cff-version: 1.2.0
+message: "If you use this research harness, please cite this repository."
+title: "Medical Image Agent Harness"
+type: software
+authors:
+  - alias: u9401066
+repository-code: "https://github.com/u9401066/medical-image-agent-harness"
+url: "https://github.com/u9401066/medical-image-agent-harness"
+version: 0.1.0
+date-released: 2026-08-19
+license: Apache-2.0

@@ -1,0 +1,6 @@
+schema_version: 1
+bundled_datasets: []
+policy: >-
+  No clinical dataset or patient image is bundled. Public fixtures must be
+  deterministic synthetic data or have explicit redistribution and
+  de-identification provenance.

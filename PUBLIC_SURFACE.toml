@@ -1,0 +1,27 @@
+package = "medical_image_harness"
+canonical_skill = ".agents/skills/medical-image-reading"
+
+forbidden_import_prefixes = [
+  "PyQt6",
+  "mss",
+  "win32",
+  "websockets",
+  "openclaw",
+  "dicom_overlay",
+]
+
+forbidden_tracked_suffixes = [
+  ".sqlite",
+  ".db",
+  ".dcm",
+  ".pfx",
+  ".pem",
+  ".key",
+]
+
+forbidden_tracked_paths = [
+  "openclaw-home",
+  "node_modules",
+  "models",
+  "checkpoints",
+]

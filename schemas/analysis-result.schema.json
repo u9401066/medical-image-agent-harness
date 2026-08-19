@@ -1,0 +1,419 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/u9401066/medical-image-agent-harness/schemas/analysis-result.schema.json",
+  "title": "Medical image agent research result",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "protocol_version",
+    "modality",
+    "assessment_scope",
+    "result_status",
+    "summary",
+    "summary_observation_ids",
+    "severity",
+    "observations",
+    "evidence",
+    "findings",
+    "checklist",
+    "image_quality",
+    "next_steps",
+    "incomplete",
+    "incomplete_reasons",
+    "review_required",
+    "review_reasons",
+    "input_provenance",
+    "study_manifest",
+    "analysis_trace"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "protocol_version": {"const": "0.1.0"},
+    "modality": {"type": "string", "minLength": 1},
+    "assessment_scope": {
+      "type": "string",
+      "enum": ["single_image_observation", "partial_study", "complete_study"]
+    },
+    "result_status": {"const": "research_draft"},
+    "summary": {"type": "string", "minLength": 1},
+    "summary_observation_ids": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "severity": {"$ref": "#/$defs/severity"},
+    "observations": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/observation"},
+      "minItems": 1
+    },
+    "evidence": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/evidence"},
+      "minItems": 1
+    },
+    "findings": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/finding"}
+    },
+    "checklist": {
+      "type": "object",
+      "additionalProperties": {"$ref": "#/$defs/checklistItem"},
+      "minProperties": 1
+    },
+    "layout": {"type": "object"},
+    "image_quality": {"$ref": "#/$defs/imageQuality"},
+    "next_steps": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "minItems": 1
+    },
+    "incomplete": {"type": "boolean"},
+    "incomplete_reasons": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "uniqueItems": true
+    },
+    "review_required": {"const": true},
+    "review_reasons": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "model_used": {"type": "string"},
+    "analysis_time_ms": {"type": "integer", "minimum": 0},
+    "input_provenance": {"$ref": "#/$defs/inputProvenance"},
+    "study_manifest": {"$ref": "#/$defs/studyManifest"},
+    "analysis_trace": {
+      "type": "array",
+      "description": "Auditable workflow facts only; never hidden chain-of-thought.",
+      "items": {"$ref": "#/$defs/workflowEvent"},
+      "minItems": 6
+    }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {"properties": {"incomplete": {"const": true}}},
+      "then": {"properties": {"incomplete_reasons": {"minItems": 1}}}
+    },
+    {
+      "if": {"properties": {"review_required": {"const": true}}},
+      "then": {"properties": {"review_reasons": {"minItems": 1}}}
+    }
+  ],
+  "$defs": {
+    "severity": {
+      "type": "string",
+      "enum": ["critical", "warning", "normal", "info"]
+    },
+    "confidence": {
+      "type": "string",
+      "enum": ["high", "moderate", "low", "not_assessable"]
+    },
+    "bbox": {
+      "type": "object",
+      "required": [
+        "x", "y", "w", "h", "coordinate_space", "verified",
+        "source_image_sha256"
+      ],
+      "properties": {
+        "x": {"type": "number", "minimum": 0, "maximum": 1},
+        "y": {"type": "number", "minimum": 0, "maximum": 1},
+        "w": {"type": "number", "exclusiveMinimum": 0, "maximum": 1},
+        "h": {"type": "number", "exclusiveMinimum": 0, "maximum": 1},
+        "coordinate_space": {"const": "source_image_normalized"},
+        "verified": {"type": "boolean"},
+        "source_image_sha256": {
+          "type": "string",
+          "pattern": "^[a-fA-F0-9]{64}$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "finding": {
+      "type": "object",
+      "required": [
+        "id",
+        "label",
+        "detail",
+        "severity",
+        "confidence",
+        "claim_type",
+        "regions",
+        "bboxes",
+        "evidence_ids",
+        "observation_ids",
+        "question"
+      ],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "label": {"type": "string", "minLength": 1},
+        "detail": {"type": "string", "minLength": 1},
+        "severity": {"$ref": "#/$defs/severity"},
+        "confidence": {"$ref": "#/$defs/confidence"},
+        "claim_type": {"$ref": "#/$defs/claimType"},
+        "regions": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "uniqueItems": true
+        },
+        "bboxes": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/bbox"}
+        },
+        "evidence_ids": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "observation_ids": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "question": {"type": "string"}
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {"properties": {"severity": {"const": "normal"}}},
+          "then": {"properties": {"bboxes": {"maxItems": 0}}}
+        },
+        {
+          "if": {"properties": {"confidence": {"const": "low"}}},
+          "then": {"properties": {"question": {"minLength": 1}}}
+        }
+      ]
+    },
+    "checklistItem": {
+      "type": "object",
+      "required": ["value", "status", "assessable"],
+      "properties": {
+        "value": {"type": "string", "minLength": 1},
+        "status": {"$ref": "#/$defs/severity"},
+        "assessable": {"type": "boolean"},
+        "evidence": {"type": "string"}
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {"properties": {"assessable": {"const": true}}},
+          "then": {
+            "required": ["evidence"],
+            "properties": {"evidence": {"minLength": 1}}
+          }
+        }
+      ]
+    },
+    "observation": {
+      "type": "object",
+      "required": [
+        "id",
+        "anatomy",
+        "finding",
+        "polarity",
+        "status",
+        "claim_type",
+        "assessable",
+        "evidence_ids",
+        "question"
+      ],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "anatomy": {"type": "string", "minLength": 1},
+        "finding": {"type": "string", "minLength": 1},
+        "polarity": {
+          "type": "string",
+          "enum": ["present", "absent", "uncertain"]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["supported", "possible", "contradicted", "unevaluable"]
+        },
+        "claim_type": {"$ref": "#/$defs/claimType"},
+        "assessable": {"type": "boolean"},
+        "laterality": {"type": "string"},
+        "temporal": {"type": "string"},
+        "evidence_ids": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "uniqueItems": true
+        },
+        "question": {"type": "string"}
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {"properties": {"assessable": {"const": true}}},
+          "then": {"properties": {"evidence_ids": {"minItems": 1}}}
+        },
+        {
+          "if": {"properties": {"assessable": {"const": false}}},
+          "then": {"properties": {"status": {"const": "unevaluable"}}}
+        }
+      ]
+    },
+    "evidence": {
+      "type": "object",
+      "required": [
+        "id", "kind", "source_image_sha256", "description", "bboxes", "source_ref"
+      ],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "kind": {
+          "type": "string",
+          "enum": ["source_region", "source_frame", "measurement", "tool_output"]
+        },
+        "source_image_sha256": {
+          "type": "string",
+          "pattern": "^[a-fA-F0-9]{64}$"
+        },
+        "description": {"type": "string", "minLength": 1},
+        "bboxes": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/bbox"}
+        },
+        "source_ref": {"type": "string", "minLength": 1},
+        "tool_name": {"type": "string"},
+        "tool_version": {"type": "string"},
+        "calibration_id": {"type": "string"}
+      },
+      "additionalProperties": false
+    },
+    "imageQuality": {
+      "type": "object",
+      "required": ["adequacy", "issues", "detail", "views_present", "views_required"],
+      "properties": {
+        "adequacy": {
+          "type": "string",
+          "enum": ["diagnostic", "limited", "non_diagnostic"]
+        },
+        "issues": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "uniqueItems": true
+        },
+        "detail": {"type": "string"},
+        "views_present": {"type": "array", "items": {"type": "string"}},
+        "views_required": {"type": "array", "items": {"type": "string"}}
+      },
+      "additionalProperties": false
+    },
+    "inputProvenance": {
+      "type": "object",
+      "required": ["source_image_sha256", "source_kind", "deidentified", "transformations"],
+      "properties": {
+        "source_image_sha256": {
+          "type": "string",
+          "pattern": "^[a-fA-F0-9]{64}$"
+        },
+        "source_kind": {
+          "type": "string",
+          "enum": ["dicom", "rendered_image", "screenshot", "waveform_render"]
+        },
+        "deidentified": {"const": true},
+        "transformations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "operation", "output_sha256", "parent_sha256", "parameters"
+            ],
+            "properties": {
+              "operation": {"type": "string", "minLength": 1},
+              "output_sha256": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"},
+              "parent_sha256": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"},
+              "parameters": {"type": "object"}
+            },
+            "additionalProperties": false
+          }
+        },
+        "dataset_id": {"type": "string"},
+        "case_id": {"type": "string"}
+      },
+      "additionalProperties": false
+    },
+    "imageAsset": {
+      "type": "object",
+      "required": ["id", "sha256", "source_kind", "deidentified"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "sha256": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"},
+        "source_kind": {
+          "type": "string",
+          "enum": ["dicom", "rendered_image", "screenshot", "waveform_render"]
+        },
+        "deidentified": {"const": true},
+        "view": {"type": "string"},
+        "laterality": {"type": "string"},
+        "orientation": {"type": "string"},
+        "series_ref": {"type": "string"},
+        "frame_number": {"type": "integer", "minimum": 1},
+        "window": {"type": "string"}
+      },
+      "additionalProperties": false
+    },
+    "studyManifest": {
+      "type": "object",
+      "required": [
+        "id", "modality", "complete", "assets", "expected_views",
+        "expected_series", "limitations"
+      ],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "modality": {"type": "string", "minLength": 1},
+        "complete": {"type": "boolean"},
+        "assets": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/imageAsset"},
+          "minItems": 1
+        },
+        "expected_views": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "uniqueItems": true
+        },
+        "expected_series": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "uniqueItems": true
+        },
+        "limitations": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "workflowEvent": {
+      "type": "object",
+      "required": ["stage", "status", "detail"],
+      "properties": {
+        "stage": {
+          "type": "string",
+          "enum": [
+            "intake", "quality_gate", "blind_pass", "independent_evidence",
+            "reconcile", "targeted_second_look", "contract_validation",
+            "human_handoff"
+          ]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["completed", "skipped", "failed"]
+        },
+        "detail": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    },
+    "claimType": {
+      "type": "string",
+      "enum": ["descriptive_observation", "diagnostic_hypothesis"]
+    }
+  }
+}

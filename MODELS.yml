@@ -1,0 +1,5 @@
+schema_version: 1
+bundled_models: []
+policy: >-
+  No model weights are bundled. Optional adapters must pin model revision,
+  weight license, intended use, calibration set, and redistribution status.
