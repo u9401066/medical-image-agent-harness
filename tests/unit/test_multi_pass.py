@@ -144,7 +144,8 @@ def test_final_reconciliation_preserves_host_bound_scientific_ledger() -> None:
 
     assert result.summary == "Reconciled narrative"
     assert result.assessment_scope == "single_image_observation"
-    assert result.summary_observation_ids == ["obs-1"]
+    # Reworded model narrative is not automatically bound to the old observations.
+    assert result.summary_observation_ids == []
     assert result.observations == draft.observations
     assert result.evidence == draft.evidence
     assert result.input_provenance == draft.input_provenance
@@ -262,12 +263,12 @@ class TestEkgSystematicProbeRegions:
         probes = select_ekg_systematic_probe_regions(result)
 
         assert [key for key, _region in probes] == [
-            "limb_leads",
             "precordial_leads",
+            "limb_leads",
         ]
-        assert probes[0][1].y == pytest.approx(0.0)
+        assert probes[0][1].y == pytest.approx(0.5)
         assert probes[0][1].h == pytest.approx(0.5)
-        assert probes[1][1].y == pytest.approx(0.5)
+        assert probes[1][1].y == pytest.approx(0.0)
         assert probes[1][1].h == pytest.approx(0.5)
 
     def test_accepts_unprefixed_real_model_lead_names(self):
@@ -278,8 +279,8 @@ class TestEkgSystematicProbeRegions:
         probes = select_ekg_systematic_probe_regions(result)
 
         assert [key for key, _region in probes] == [
-            "limb_leads",
             "precordial_leads",
+            "limb_leads",
         ]
 
     def test_accepts_case_and_separator_variants(self):
@@ -304,8 +305,8 @@ class TestEkgSystematicProbeRegions:
         probes = select_ekg_systematic_probe_regions(result)
 
         assert [key for key, _region in probes] == [
-            "limb_leads",
             "precordial_leads",
+            "limb_leads",
         ]
 
     def test_rejects_sparse_or_non_ekg_layout(self):
@@ -532,6 +533,8 @@ class _HypothesisAwareAnalyzer(_FakeAnalyzer):
         *,
         hypothesis,
         crop_region,
+        probe_id="",
+        crop_lead_regions=None,
     ):
         self.refine_calls.append(
             {
@@ -540,6 +543,8 @@ class _HypothesisAwareAnalyzer(_FakeAnalyzer):
                 "valid_regions": valid_regions,
                 "hypothesis": hypothesis,
                 "crop_region": crop_region,
+                "probe_id": probe_id,
+                "crop_lead_regions": crop_lead_regions,
             }
         )
         return self._refinements.pop(0)
@@ -634,7 +639,7 @@ class TestMultiPassInterpreter:
         assert len(analyzer.refine_calls) == 2
         assert all(call["hypothesis"] is None for call in analyzer.refine_calls)
         assert cropper.images == ["original-image", "original-image"]
-        assert [region.y for region in cropper.regions] == pytest.approx([0.0, 0.5])
+        assert [region.y for region in cropper.regions] == pytest.approx([0.5, 0.0])
         assert result.severity is Severity.WARNING
         assert [finding.id for finding in result.findings] == ["st_probe"]
         assert any(
@@ -724,7 +729,8 @@ class TestMultiPassInterpreter:
             source_size_px=(1000, 1000),
         )
 
-        assert result.summary == "Reconciled final narrative."
+        # Invented finding IDs invalidate the final response, not just its boxes.
+        assert result.summary == coarse.summary
         assert result.severity is Severity.WARNING
         assert [finding.id for finding in result.findings] == ["f1"]
         assert result.findings[0].detail == "confirmed on crop"
@@ -732,7 +738,9 @@ class TestMultiPassInterpreter:
         assert result.layout == {"format": "partial"}
         assert analyzer.finalize_calls[0]["image"] == "original-image"
         assert analyzer.finalize_calls[0]["refinement_trace"]
-        assert result.analysis_trace[-1]["stage"] == "finalize"
+        final_event = next(e for e in result.analysis_trace if e["stage"] == "finalize")
+        assert final_event["status"] == "failed"
+        assert "cannot add findings" in final_event["error"]
         assert result.analysis_trace[-1]["status"] == "completed"
 
     async def test_negative_refinement_still_runs_final_report_reconciliation(self):
@@ -765,8 +773,15 @@ class TestMultiPassInterpreter:
         assert len(analyzer.finalize_calls) == 1
         assert analyzer.finalize_calls[0]["refinement_trace"]
         assert result.summary == "Regional review found no additional finding."
-        assert [finding.id for finding in result.findings] == ["f1"]
-        assert result.analysis_trace[-1]["stage"] == "finalize"
+        assert result.findings == []
+        assert any(
+            e["stage"] == "final_disposition" and e["status"] == "retracted"
+            and e["finding_id"] == "f1" for e in result.analysis_trace
+        )
+        assert any(
+            e["stage"] == "finalize" and e["status"] == "completed"
+            for e in result.analysis_trace
+        )
 
     async def test_refinement_crop_uses_original_source_not_coarse_downscale(self):
         box = RegionRect(x=0.2, y=0.2, w=0.4, h=0.4)
@@ -799,7 +814,8 @@ class TestMultiPassInterpreter:
 
         assert analyzer.images == ["coarse-downscale"]
         assert cropper.images == ["original-roi"]
-        assert result.analysis_trace[-1]["crop_source"] == "original_roi"
+        refinement = next(e for e in result.analysis_trace if e["stage"] == "refine")
+        assert refinement["crop_source"] == "original_roi"
 
     async def test_no_abnormal_findings_skips_zoom(self):
         coarse = _result([])
@@ -887,7 +903,10 @@ class TestMultiPassInterpreter:
         assert confirmed.label == "opacity"
         assert confirmed.severity is Severity.WARNING
         assert confirmed.detail == "confirmed on targeted crop"
-        assert "targeted second turn" in confirmed.notes
+        assert confirmed.notes == [
+            "[Crop-only evidence; ROI x=0.2000 y=0.3000 w=0.4000 h=0.3000] "
+            "targeted second turn"
+        ]
 
     async def test_confirm_preserves_coarse_result_severity_floor(self):
         box = RegionRect(x=0.2, y=0.3, w=0.4, h=0.3)
@@ -1100,7 +1119,7 @@ class TestMultiPassInterpreter:
         assert analyzer.zoom_calls == 1
         assert out.findings[0].detail == "coarse"
 
-    async def test_local_candidate_refines_abnormal_finding_without_bbox(self):
+    async def test_local_candidate_cannot_confirm_unlocalized_whole_roi_finding(self):
         coarse = _result(
             [
                 _finding(
@@ -1139,13 +1158,11 @@ class TestMultiPassInterpreter:
         assert cropper.regions == [candidate]
         refined = out.findings[0]
         assert refined.id == "f1"
-        assert refined.detail == "candidate crop confirms opacity"
-        assert refined.bboxes
-        bbox = refined.bboxes[0]
-        assert bbox.x == pytest.approx(0.3)
-        assert bbox.y == pytest.approx(0.3)
-        assert bbox.w == pytest.approx(0.2)
-        assert bbox.h == pytest.approx(0.2)
+        assert refined == coarse.findings[0]
+        guard = next(e for e in out.analysis_trace
+            if e.get("status") == "partial_crop_confirmation_blocked")
+        assert guard["source_was_unlocalized"] is True
+        assert guard["decision_applied"] is False
 
     async def test_normal_safety_probe_can_be_disabled(self):
         coarse = _result([])

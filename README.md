@@ -80,6 +80,7 @@ then call `AnalysisResult.to_contract_payload()`. That method invokes the canoni
 schema and semantic validator and fails closed when any binding is absent.
 
 See [Methodology](docs/METHODOLOGY.md), [integration boundary](docs/INTEGRATION.md),
+the [bounded multi-pass engine and host policy](docs/MULTIPASS.md),
 and [prior-art/license research](docs/PRIOR_ART.md).
 
 ## Supported protocol profiles

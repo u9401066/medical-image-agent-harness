@@ -3,9 +3,21 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from typing import Protocol
 
 from medical_image_harness.models import AnalysisResult, Modality
+
+PENDING_MULTIPASS_REASON = "pending_multipass_review"
+
+
+@dataclass(frozen=True)
+class StageTools:
+    """Host-supplied auditable identities; never executable tool implementations."""
+
+    coarse: str = "vision_analysis"
+    refinement: str = "crop_region_base64+vision_analysis"
+    finalize: str = "report_reconciliation"
 
 
 class AnalyzerPort(Protocol):
@@ -20,7 +32,7 @@ class AnalyzerPort(Protocol):
 
 
 class VisionAnalyzerService(ABC):
-    """Compatibility lifecycle for hosts that keep a connected agent session."""
+    """Connected analyzer lifecycle implemented by host-owned adapters."""
 
     @abstractmethod
     async def analyze(
