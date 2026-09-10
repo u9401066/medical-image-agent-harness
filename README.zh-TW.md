@@ -1,5 +1,8 @@
 # Medical Image Agent Harness
 
+Python 套件包含 `py.typed` 標記，讓使用者可直接對公開資料模型進行型別檢查，
+不必忽略未型別化匯入錯誤。此標記不是臨床驗證或完整型別檢查通過的宣稱。
+
 這是一套供 Codex 與 GitHub Copilot 共用、可測試且不綁模型供應商的醫學影像
 共同判讀科學 harness。它把品質守門、系統性盲讀、證據定位、反證式 second
 look、不確定性、來源追溯與評測契約從商品整合中獨立出來。
