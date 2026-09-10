@@ -1,3 +1,5 @@
+from importlib.resources import files
+
 from medical_image_harness.resources import (
     load_modality_prompt,
     load_skill,
@@ -12,3 +14,7 @@ def test_skill_and_modality_prompt_load_from_single_source() -> None:
     assert "Blind systematic pass" in prompt
     assert "Lead-conditioned blind pass" in prompt
     assert len(skill_sha256()) == 64
+
+
+def test_inline_type_marker_is_packaged() -> None:
+    assert files("medical_image_harness").joinpath("py.typed").is_file()

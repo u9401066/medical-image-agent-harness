@@ -10,6 +10,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 DIST = ROOT / "dist"
 REQUIRED = {
+    "medical_image_harness/py.typed",
     "medical_image_harness/schemas/analysis-result.schema.json",
     "medical_image_harness/skills/medical-image-reading/SKILL.md",
     "medical_image_harness/skills/medical-image-reading/references/core-protocol.md",
@@ -33,7 +34,7 @@ def main() -> int:
     if missing:
         print("built wheel is missing:\n" + "\n".join(missing), file=sys.stderr)
         return 1
-    print("Built wheel contains the canonical skill and result schema")
+    print("Built wheel contains the typed-package marker, canonical skill and result schema")
     return 0
 
 

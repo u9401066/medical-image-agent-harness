@@ -48,6 +48,11 @@ guards, cited clinical-consistency rules, source-safe image operations, multi-pa
 and rhythm-strip refinement, provenance fingerprints, and transparent evaluation
 metrics.
 
+Inline Python annotations are exposed through the packaged `py.typed` marker.
+Consumers can type-check direct model imports without adding untyped-import
+suppression. This is typing metadata, not a whole-codebase type-check or clinical
+validation claim.
+
 ```bash
 uv sync --extra dev
 uv run python scripts/check_compatibility.py
