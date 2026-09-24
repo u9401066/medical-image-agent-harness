@@ -10,6 +10,16 @@ evidence contract, multi-pass verification loop, safety gates, and evaluation AP
 
 ## Why this exists
 
+`MultiPassInterpreter(..., prefer_ekg_group_coverage=True)` optionally reserves a
+two-crop budget for both observed limb and precordial groups. It requires a complete,
+valid, explicitly labeled 12-lead inventory **before** any layout normalization,
+two bounded group crops, and at least two enabled systematic probes. Existing
+hypotheses can be verified inside those groups; discovery may add source-remapped
+findings. Critical-first triage, waveform/local attention, partial/unknown inputs,
+other modalities and other budgets keep their existing routes. The default is
+off. Coverage is a crop-planning fact, not proof of a complete or correct diagnosis;
+deadlines can still prevent a planned crop from executing. No model call is added.
+
 Vision-capable agents can inspect an image, but a reliable research workflow needs
 more than a prompt. This repository makes the method inspectable and testable:
 
@@ -78,6 +88,21 @@ must attach the de-identified study manifest, exact provenance, observation/evid
 ledger, ordered workflow events, assessment scope, and human-review disposition,
 then call `AnalysisResult.to_contract_payload()`. That method invokes the canonical
 schema and semantic validator and fails closed when any binding is absent.
+
+Scientific checklist items support one or more exact `observation_ids`, for
+example `["o1", "o2"]`. Every reference is checked; assessable items cannot cite
+contradicted or unevaluable observations. Legacy single-ID `evidence` remains
+accepted, but comma-joined IDs and simultaneous nonempty reference fields are
+rejected, never silently repaired. This additive contract extension is identified
+by the pinned harness revision; readers pinned to earlier revisions may reject
+the new field. See the [output contract](.agents/skills/medical-image-reading/references/output-contract.md).
+
+Hosts that validate content before making it available for review can use the
+separate `schema.preflight_validation_errors(payload)` API. It checks the same
+content against an executed prefix and forbids future validation/handoff events.
+It is not canonical acceptance: the normal serializer/CLI still require real
+completed validation and handoff records. See the
+[preflight boundary](.agents/skills/medical-image-reading/references/output-contract.md#preflight-before-actual-human-handoff).
 
 See [Methodology](docs/METHODOLOGY.md), [integration boundary](docs/INTEGRATION.md),
 the [bounded multi-pass engine and host policy](docs/MULTIPASS.md),

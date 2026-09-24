@@ -1670,7 +1670,9 @@ def test_final_report_can_revise_clinical_fields_with_locked_geometry() -> None:
     assert disposition["geometry_locked"] is True
 
 
-@pytest.mark.parametrize("limitation", ["", "Lead V1 missing", "Preliminary triage; review pending"])
+@pytest.mark.parametrize(
+    "limitation", ["", "Lead V1 missing", "Preliminary triage; review pending"]
+)
 def test_final_report_resolves_only_exact_workflow_marker(limitation):
     from medical_image_harness.profiles import get_active_registry
     from medical_image_harness.protocols import (
@@ -1679,7 +1681,10 @@ def test_final_report_resolves_only_exact_workflow_marker(limitation):
 
     draft = _result([])
     draft.incomplete = True
-    draft.incomplete_reasons = [PENDING_MULTIPASS_REASON, *([limitation] if limitation else [])]
+    draft.incomplete_reasons = [
+        PENDING_MULTIPASS_REASON,
+        *([limitation] if limitation else []),
+    ]
     final = _result([])
     final.checklist = {
         key: ChecklistItem(value="assessed", status=Severity.NORMAL)
@@ -2618,6 +2623,171 @@ def test_unavailable_unlocalized_rhythm_strip_region_is_removed() -> None:
     assert reconciled.analysis_trace[-1]["status"] == (
         "removed_unlocalized_rhythm_strip"
     )
+
+
+class TestTwoTurnGroupCoverage:
+    @pytest.mark.parametrize("enabled", [False, True])
+    async def test_opt_in_covers_both_groups_and_pairs_existing_hypotheses(
+        self, enabled
+    ):
+        coarse = _ekg_row_layout_result(
+            [
+                _finding("limb", Severity.WARNING, RegionRect(0.2, 0.1, 0.15, 0.04)),
+                _finding("chest", Severity.WARNING, RegionRect(0.2, 0.85, 0.15, 0.04)),
+            ]
+        )
+        analyzer = _HypothesisAwareAnalyzer(
+            coarse, [RefinementResult(), RefinementResult()]
+        )
+        cropper = _RecordingCropper()
+        interpreter = MultiPassInterpreter(
+            analyzer,
+            cropper,
+            max_zoom_targets=2,
+            zoom_padding=0,
+            prefer_ekg_group_coverage=enabled,
+        )
+        result = await interpreter.interpret(
+            "source", Modality.EKG, [], source_size_px=(1000, 1200)
+        )
+        assert len(analyzer.refine_calls) == 2
+        assert cropper.images == ["source", "source"]
+        planned = [
+            e
+            for e in result.analysis_trace
+            if e.get("status") == "full_lead_group_coverage"
+        ]
+        assert bool(planned) is enabled
+        if enabled:
+            assert cropper.regions == [
+                RegionRect(0, 0.5, 1, 0.5),
+                RegionRect(0, 0, 1, 0.5),
+            ]
+            assert [c["hypothesis"].id for c in analyzer.refine_calls] == [
+                "chest",
+                "limb",
+            ]
+            assert all(
+                c["probe_id"].startswith("ekg_systematic_")
+                for c in analyzer.refine_calls
+            )
+            assert [len(c["crop_lead_regions"]) for c in analyzer.refine_calls] == [
+                6,
+                6,
+            ]
+            assert planned[0]["diagnostic_completeness_asserted"] is False
+        else:
+            assert (
+                cropper.regions[0].w < 1
+            )  # The legacy narrow-first route is unchanged.
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            "missing",
+            "unknown",
+            "malformed",
+            "critical",
+            "one_turn",
+            "three_turns",
+            "probes_disabled",
+            "local_attention",
+            "other_modality",
+            "duplicate_label",
+            "waveform_attention",
+        ],
+    )
+    async def test_coverage_policy_does_not_override_ineligible_or_priority_routes(
+        self, case, monkeypatch
+    ):
+        coarse = _ekg_row_layout_result(
+            [
+                _finding(
+                    "candidate", Severity.WARNING, RegionRect(0.2, 0.7, 0.15, 0.04)
+                ),
+            ]
+        )
+        options = {"max_zoom_targets": 2, "max_ekg_systematic_probes": 2}
+        local = None
+        if case == "missing":
+            coarse.layout["leads"].pop()
+        elif case == "unknown":
+            coarse.layout["leads"][0]["label_visible"] = False
+        elif case == "malformed":
+            coarse.layout["leads"][0]["bbox"] = [0, 0, 2, 1]
+        elif case == "critical":
+            coarse.findings[0] = dataclasses.replace(
+                coarse.findings[0],
+                severity=Severity.CRITICAL,
+                label="Possible acute ST-elevation ischemic pattern",
+                detail="Contiguous ST elevation with reciprocal depression is visible.",
+            )
+            coarse.severity = Severity.CRITICAL
+        elif case == "one_turn":
+            options["max_zoom_targets"] = 1
+        elif case == "three_turns":
+            options["max_zoom_targets"] = 3
+        elif case == "probes_disabled":
+            options["max_ekg_systematic_probes"] = 0
+        elif case == "local_attention":
+            local = [RegionRect(0.5, 0.8, 0.1, 0.1)]
+        elif case == "other_modality":
+            coarse.modality = Modality.CXR
+        elif case == "duplicate_label":
+            coarse.layout["leads"].append(dict(coarse.layout["leads"][0]))
+        elif case == "waveform_attention":
+            monkeypatch.setattr(
+                "medical_image_harness.multipass.select_ekg_waveform_attention_probe_regions",
+                lambda _result: [("waveform_rhythm", RegionRect(0, 0.08, 1, 0.09))],
+            )
+        analyzer = _HypothesisAwareAnalyzer(coarse, [RefinementResult()] * 3)
+        result = await MultiPassInterpreter(
+            analyzer,
+            _RecordingCropper(),
+            prefer_ekg_group_coverage=True,
+            **options,
+        ).interpret(
+            "source",
+            coarse.modality,
+            [],
+            source_size_px=(1000, 1200),
+            local_candidate_regions=local,
+        )
+        assert not any(
+            e.get("status") == "full_lead_group_coverage" for e in result.analysis_trace
+        )
+        assert len(analyzer.refine_calls) <= options["max_zoom_targets"]
+        if case == "critical":
+            assert analyzer.refine_calls[0]["hypothesis"].id == "candidate"
+            assert any(
+                e.get("stage") == "critical_triage" and e.get("status") == "activated"
+                for e in result.analysis_trace
+            )
+
+    async def test_group_discovery_adds_source_remapped_finding_without_extra_turn(
+        self,
+    ):
+        coarse = _ekg_row_layout_result([])
+        addition = RefinementDelta(
+            action=RefinementAction.ADD,
+            finding=_finding("new", Severity.WARNING, RegionRect(0.2, 0.2, 0.2, 0.1)),
+            rationale="Synthetic visible candidate in this group.",
+        )
+        analyzer = _HypothesisAwareAnalyzer(
+            coarse, [RefinementResult((addition,)), RefinementResult()]
+        )
+        result = await MultiPassInterpreter(
+            analyzer,
+            _RecordingCropper(),
+            max_zoom_targets=2,
+            zoom_padding=0,
+            prefer_ekg_group_coverage=True,
+        ).interpret("source", Modality.EKG, [], source_size_px=(1000, 1200))
+        assert len(analyzer.refine_calls) == 2
+        assert all(call["hypothesis"] is None for call in analyzer.refine_calls)
+        finding = next(f for f in result.findings if f.id == "new")
+        assert finding.bboxes[0].y == pytest.approx(0.6)
+        assert finding.bboxes[0].h == pytest.approx(0.05)
 
 
 class TestMultiPassRefinementSafety:
@@ -3645,8 +3815,11 @@ class TestMultiPassRefinementSafety:
         refined = out.findings[0]
         assert refined.id == "f1"
         assert refined == coarse.findings[0]
-        guard = next(e for e in out.analysis_trace
-            if e.get("status") == "partial_crop_confirmation_blocked")
+        guard = next(
+            e
+            for e in out.analysis_trace
+            if e.get("status") == "partial_crop_confirmation_blocked"
+        )
         assert guard["source_was_unlocalized"] is True
         assert guard["decision_applied"] is False
 

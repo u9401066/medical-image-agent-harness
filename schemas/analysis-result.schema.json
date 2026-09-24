@@ -197,15 +197,32 @@
         "value": {"type": "string", "minLength": 1},
         "status": {"$ref": "#/$defs/severity"},
         "assessable": {"type": "boolean"},
-        "evidence": {"type": "string"}
+        "evidence": {
+          "type": "string",
+          "description": "Legacy single observation ID for an assessable item; never a comma-separated list. Prefer observation_ids."
+        },
+        "observation_ids": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "uniqueItems": true,
+          "description": "Exact observation IDs supporting this checklist item; every reference must resolve."
+        }
       },
       "additionalProperties": false,
       "allOf": [
         {
           "if": {"properties": {"assessable": {"const": true}}},
           "then": {
-            "required": ["evidence"],
-            "properties": {"evidence": {"minLength": 1}}
+            "anyOf": [
+              {"required": ["observation_ids"], "properties": {"observation_ids": {"minItems": 1}}},
+              {"required": ["evidence"], "properties": {"evidence": {"minLength": 1}}}
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": ["evidence", "observation_ids"],
+            "properties": {"evidence": {"minLength": 1}, "observation_ids": {"minItems": 1}}
           }
         }
       ]

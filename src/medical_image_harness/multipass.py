@@ -1729,7 +1729,9 @@ def apply_refinement_delta(
             mapped,
             id=_unique_finding_id(findings, mapped.id),
             notes=_merge_crop_notes([], mapped.notes, delta.rationale, crop_region),
-            evidence=[], evidence_ids=[], observation_ids=[],
+            evidence=[],
+            evidence_ids=[],
+            observation_ids=[],
         )
         return [*findings, mapped]
 
@@ -1762,7 +1764,9 @@ def apply_refinement_delta(
                     bboxes=mapped.bboxes or current.bboxes,
                     regions=mapped.regions or current.regions,
                     notes=notes,
-                    evidence=[], evidence_ids=[], observation_ids=[],
+                    evidence=[],
+                    evidence_ids=[],
+                    observation_ids=[],
                 )
             )
         else:
@@ -1775,7 +1779,9 @@ def apply_refinement_delta(
                     bboxes=mapped.bboxes or current.bboxes,
                     regions=mapped.regions or current.regions,
                     notes=notes,
-                    evidence=[], evidence_ids=[], observation_ids=[],
+                    evidence=[],
+                    evidence_ids=[],
+                    observation_ids=[],
                 )
             )
     return result
@@ -2258,12 +2264,22 @@ def reconcile_final_report(
         )
         revised_fields = [
             name
-            for name in ("label", "detail", "severity", "confidence", "question", "claim_type")
+            for name in (
+                "label",
+                "detail",
+                "severity",
+                "confidence",
+                "question",
+                "claim_type",
+            )
             if getattr(reconciled_finding, name) != getattr(draft_finding, name)
         ]
         if revised_fields:
             reconciled_finding = dataclasses.replace(
-                reconciled_finding, evidence=[], evidence_ids=[], observation_ids=[],
+                reconciled_finding,
+                evidence=[],
+                evidence_ids=[],
+                observation_ids=[],
             )
         findings.append(reconciled_finding)
         disposition_trace.append(
@@ -2304,7 +2320,8 @@ def reconcile_final_report(
     )
     required_axes = (
         default_checklist_keys(draft.modality)
-        if required_checklist_keys is None else required_checklist_keys
+        if required_checklist_keys is None
+        else required_checklist_keys
     )
     pending_resolved = (
         PENDING_MULTIPASS_REASON in draft.incomplete_reasons
@@ -2313,7 +2330,8 @@ def reconcile_final_report(
         and PENDING_MULTIPASS_REASON not in final.incomplete_reasons
     )
     draft_reasons = [
-        reason for reason in draft.incomplete_reasons
+        reason
+        for reason in draft.incomplete_reasons
         if not (pending_resolved and reason == PENDING_MULTIPASS_REASON)
     ]
     draft_still_incomplete = draft.incomplete and (
@@ -2328,8 +2346,10 @@ def reconcile_final_report(
         final.validation_warnings,
     )
     incomplete = (
-        draft_still_incomplete or final.incomplete
-        or bool(validation_warnings) or bool(incomplete_reasons)
+        draft_still_incomplete
+        or final.incomplete
+        or bool(validation_warnings)
+        or bool(incomplete_reasons)
     )
     host_review_required = bool(draft.input_provenance) and draft.review_required
     review_reasons = unique(
@@ -2337,13 +2357,15 @@ def reconcile_final_report(
         final.review_reasons,
     )
     if pending_resolved:
-        disposition_trace.append({
-            "stage": "workflow_progress",
-            "status": "resolved",
-            "reason": PENDING_MULTIPASS_REASON,
-            "evidence": "accepted_final_report_with_all_required_checklist_axes",
-            "clinical_limitations_removed": False,
-        })
+        disposition_trace.append(
+            {
+                "stage": "workflow_progress",
+                "status": "resolved",
+                "reason": PENDING_MULTIPASS_REASON,
+                "evidence": "accepted_final_report_with_all_required_checklist_axes",
+                "clinical_limitations_removed": False,
+            }
+        )
 
     return dataclasses.replace(
         final,
@@ -2356,8 +2378,11 @@ def reconcile_final_report(
         observations=list(draft.observations),
         evidence=list(draft.evidence),
         workflow_events=list(draft.workflow_events),
-        summary_observation_ids=(list(draft.summary_observation_ids)
-            if not final.summary.strip() or final.summary.strip() == draft.summary else []),
+        summary_observation_ids=(
+            list(draft.summary_observation_ids)
+            if not final.summary.strip() or final.summary.strip() == draft.summary
+            else []
+        ),
         modality=draft.modality,
         summary=final.summary.strip() or draft.summary,
         severity=severity,
@@ -2391,9 +2416,10 @@ def complete_unassessed_checklist_fallback(
     """Keep a failed bounded final turn structurally honest and reviewable."""
 
     required = (
-            default_checklist_keys(result.modality)
-            if required_checklist_keys is None else required_checklist_keys
-        )
+        default_checklist_keys(result.modality)
+        if required_checklist_keys is None
+        else required_checklist_keys
+    )
     missing = sorted(required - set(result.checklist))
     if not missing:
         return result
@@ -2726,7 +2752,8 @@ def apply_critical_triage_guard(
     if result.modality is Modality.EKG:
         required = (
             default_checklist_keys(result.modality)
-            if required_checklist_keys is None else required_checklist_keys
+            if required_checklist_keys is None
+            else required_checklist_keys
         )
         protected_axes = _critical_ekg_evidence_axes(critical_findings)
         deferred_axes = sorted(required - protected_axes)
@@ -2928,6 +2955,7 @@ class MultiPassInterpreter:
         zoom_retry_attempts: int = 1,
         max_normal_safety_probes: int = DEFAULT_MAX_NORMAL_SAFETY_PROBES,
         max_ekg_systematic_probes: int = DEFAULT_MAX_EKG_SYSTEMATIC_PROBES,
+        prefer_ekg_group_coverage: bool = False,
         max_local_candidate_area: float = DEFAULT_MAX_LOCAL_CANDIDATE_AREA,
         initial_response_sla_sec: float = DEFAULT_INITIAL_RESPONSE_SLA_SEC,
         first_refinement_sla_sec: float = DEFAULT_FIRST_REFINEMENT_SLA_SEC,
@@ -2937,7 +2965,9 @@ class MultiPassInterpreter:
         finalization_reserve_sec: float = DEFAULT_FINALIZATION_RESERVE_SEC,
         min_followup_budget_sec: float = DEFAULT_MIN_FOLLOWUP_BUDGET_SEC,
         clock: Callable[[], float] = time.monotonic,
-        checklist_keys_for: Callable[[Modality], frozenset[str]] = default_checklist_keys,
+        checklist_keys_for: Callable[
+            [Modality], frozenset[str]
+        ] = default_checklist_keys,
         stage_tools: StageTools | None = None,
     ) -> None:
         if max_zoom_targets < 0:
@@ -2983,6 +3013,7 @@ class MultiPassInterpreter:
         self._zoom_retry_attempts = zoom_retry_attempts
         self._max_normal_safety_probes = max_normal_safety_probes
         self._max_ekg_systematic_probes = max_ekg_systematic_probes
+        self._prefer_ekg_group_coverage = prefer_ekg_group_coverage
         self._max_local_candidate_area = max_local_candidate_area
         self._initial_response_sla_sec = float(initial_response_sla_sec)
         self._first_refinement_sla_sec = float(first_refinement_sla_sec)
@@ -3037,6 +3068,14 @@ class MultiPassInterpreter:
                 budget_sec=self._initial_response_sla_sec,
                 elapsed_ms=deadline.elapsed_ms(),
             ) from exc
+        declared_inventory = parse_ekg_lead_inventory(coarse.layout)
+        complete_declared_inventory = (
+            coarse.modality is Modality.EKG
+            and declared_inventory.source_present
+            and not declared_inventory.missing_names
+            and not declared_inventory.duplicate_names
+            and not declared_inventory.malformed_entries
+        )
         initial_response_ms = deadline.elapsed_ms()
         if coarse.modality is Modality.EKG:
             image_layout_evidence: dict[str, object] | None = None
@@ -3200,6 +3239,42 @@ class MultiPassInterpreter:
                     len(systematic_candidates),
                     self._max_zoom_targets,
                 )
+
+        # With two turns, a narrow known-finding crop plus one discovery group
+        # can leave the rest of the other group entirely uninspected at detail
+        # resolution. Opt-in hosts can instead verify hypotheses within both
+        # observed lead groups, without another model call or invented leads.
+        # Critical-first and independent waveform/local attention keep priority.
+        expected_leads = {
+            name for _key, names in _EKG_SYSTEMATIC_LEAD_GROUPS for name in names
+        }
+        group_coverage_first = (
+            self._prefer_ekg_group_coverage
+            and complete_declared_inventory
+            and not critical_triage_active
+            and self._max_zoom_targets == 2
+            and self._max_ekg_systematic_probes >= 2
+            and not waveform_attention_candidates
+            and not local_candidate_regions
+            and len(generic_systematic_candidates) == 2
+            and expected_leads.issubset(
+                parse_ekg_lead_inventory(coarse.layout).by_name()
+            )
+        )
+        if group_coverage_first:
+            systematic_candidates = generic_systematic_candidates
+            systematic_budget = 2
+            model_findings = all_model_findings
+            trace.append(
+                {
+                    "stage": "crop_planning",
+                    "status": "full_lead_group_coverage",
+                    "tool": "ekg_layout_lead_group_probes",
+                    "max_refinement_turns": 2,
+                    "observed_lead_count": len(expected_leads),
+                    "diagnostic_completeness_asserted": False,
+                }
+            )
 
         specific_budget = self._max_zoom_targets - systematic_budget
         targets: list[_RefinementTarget] = []
@@ -3812,7 +3887,9 @@ class MultiPassInterpreter:
                 completion_grace_sec=_FOLLOWUP_COMPLETION_GRACE_SEC,
             )
             reconciled = reconcile_final_report(
-                draft, final, required_checklist_keys=self._checklist_keys_for(modality),
+                draft,
+                final,
+                required_checklist_keys=self._checklist_keys_for(modality),
                 finalization_tool=self._stage_tools.finalize,
             )
         except Exception as exc:
@@ -3843,7 +3920,8 @@ class MultiPassInterpreter:
                 review_reasons=list(dict.fromkeys([*draft.review_reasons, reason])),
             )
             return complete_unassessed_checklist_fallback(
-                fallback, reason=reason,
+                fallback,
+                reason=reason,
                 required_checklist_keys=self._checklist_keys_for(modality),
             )
 
