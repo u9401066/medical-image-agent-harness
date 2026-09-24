@@ -15,12 +15,18 @@ from medical_image_harness.models import (
 )
 from medical_image_harness.multipass import (
     MultiPassInterpreter,
+    RefinementAction,
     RefinementResult,
     apply_critical_triage_guard,
     complete_unassessed_checklist_fallback,
     reconcile_final_report,
 )
 from medical_image_harness.protocols import PENDING_MULTIPASS_REASON, StageTools
+
+
+def test_refinement_action_is_a_direct_public_definition():
+    assert RefinementAction.__name__ == "RefinementAction"
+    assert RefinementAction.__module__ == "medical_image_harness.multipass"
 
 
 def draft():

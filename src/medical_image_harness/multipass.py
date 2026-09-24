@@ -430,18 +430,13 @@ class BboxCalibrator(Protocol):
     ) -> AnalysisResult: ...
 
 
-class _RefinementAction(StrEnum):
+class RefinementAction(StrEnum):
     """A hypothesis-aware decision returned by a crop refinement turn."""
 
     CONFIRM = "confirm"
     REVISE = "revise"
     RETRACT = "retract"
     ADD = "add"
-
-
-# Public contract alias. The implementation class stays private so the repo's
-# wiring guard does not mistake this value enum for an application orchestrator.
-RefinementAction = _RefinementAction
 
 
 @dataclasses.dataclass(frozen=True)
