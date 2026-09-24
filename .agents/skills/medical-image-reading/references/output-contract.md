@@ -44,3 +44,17 @@ Contract rules that require semantic validation in addition to JSON Schema:
 
 Use `medical-image-harness validate RESULT.json` for deterministic validation.
 Adapters may add transport envelopes but must not weaken this payload contract.
+
+## Preflight before actual human handoff
+
+Hosts may call `medical_image_harness.schema.preflight_validation_errors(payload)`
+before executing their validation/handoff completion steps. This separately named
+API checks the same scientific content, source bindings and executed workflow
+prefix; it rejects any supplied `contract_validation` or `human_handoff` event.
+It never generates future events or changes the canonical schema resource.
+
+A preflight pass is **not** canonical acceptance. After content validation and
+actual review availability finish, append only their real host execution facts and
+run the ordinary full validator. Review availability is not human approval, report
+signing or clinical truth. The normal CLI and `AnalysisResult.to_contract_payload()`
+continue to require the full contract; they have no preflight-relaxation flag.

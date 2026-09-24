@@ -37,7 +37,9 @@ _REQUIRED_TRACE_STAGES = {
 
 
 def _source_schema_path() -> Path:
-    return Path(__file__).resolve().parents[2] / "schemas" / "analysis-result.schema.json"
+    return (
+        Path(__file__).resolve().parents[2] / "schemas" / "analysis-result.schema.json"
+    )
 
 
 def schema_text() -> str:
@@ -58,17 +60,35 @@ def load_schema() -> dict[str, Any]:
 
 
 def validation_errors(payload: object) -> list[str]:
-    validator = jsonschema.Draft202012Validator(load_schema())
+    return _validation_errors(payload, preflight=False)
+
+
+def preflight_validation_errors(payload: object) -> list[str]:
+    """Check content and executed prefix BEFORE validation/handoff completion.
+
+    This is not canonical acceptance. Future validation/handoff events are
+    forbidden, not manufactured. The ordinary validator and schema remain strict;
+    callers must validate the final payload after those real operations finish.
+    """
+    return _validation_errors(payload, preflight=True)
+
+
+def _validation_errors(payload: object, *, preflight: bool) -> list[str]:
+    schema = load_schema()
+    if preflight:
+        # A fresh schema copy only; the canonical resource is never relaxed.
+        schema["properties"]["analysis_trace"]["minItems"] = 4
+    validator = jsonschema.Draft202012Validator(schema)
     errors = sorted(validator.iter_errors(payload), key=lambda error: list(error.path))
     rendered: list[str] = []
     for error in errors:
         path = "/".join(str(part) for part in error.absolute_path) or "$"
         rendered.append(f"{path}: {error.message}")
-    rendered.extend(_semantic_errors(payload))
+    rendered.extend(_semantic_errors(payload, preflight=preflight))
     return rendered
 
 
-def _semantic_errors(payload: object) -> list[str]:
+def _semantic_errors(payload: object, *, preflight: bool = False) -> list[str]:
     if not isinstance(payload, dict):
         return []
     errors: list[str] = _non_finite_errors(payload)
@@ -170,7 +190,9 @@ def _semantic_errors(payload: object) -> list[str]:
                 )
         for reference in finding_evidence_ids:
             if reference not in evidence_ids:
-                errors.append(f"findings/{finding_id}: unresolved evidence {reference!r}")
+                errors.append(
+                    f"findings/{finding_id}: unresolved evidence {reference!r}"
+                )
         if not finding_evidence_ids.issubset(observation_evidence_ids):
             errors.append(
                 f"findings/{finding_id}: evidence is not linked through its observations"
@@ -179,9 +201,7 @@ def _semantic_errors(payload: object) -> list[str]:
         linked_box_signatures = {
             _box_signature(box)
             for reference in finding_evidence_ids
-            for box in list_value(
-                evidence_by_id.get(reference, {}).get("bboxes")
-            )
+            for box in list_value(evidence_by_id.get(reference, {}).get("bboxes"))
             if isinstance(box, dict)
         }
         for index, box in enumerate(list_value(finding.get("bboxes"))):
@@ -208,9 +228,7 @@ def _semantic_errors(payload: object) -> list[str]:
 
     provenance = payload.get("input_provenance")
     source_hash = (
-        provenance.get("source_image_sha256")
-        if isinstance(provenance, dict)
-        else None
+        provenance.get("source_image_sha256") if isinstance(provenance, dict) else None
     )
     manifest = payload.get("study_manifest")
     assets = list_value(manifest.get("assets")) if isinstance(manifest, dict) else []
@@ -294,9 +312,10 @@ def _semantic_errors(payload: object) -> list[str]:
             errors.append(
                 f"evidence/{evidence.get('id', '?')}: tool output lacks name/version"
             )
-        if evidence.get("kind") != "tool_output" and evidence.get(
-            "source_ref"
-        ) not in asset_by_id:
+        if (
+            evidence.get("kind") != "tool_output"
+            and evidence.get("source_ref") not in asset_by_id
+        ):
             errors.append(
                 f"evidence/{evidence.get('id', '?')}: source_ref is not a manifest asset"
             )
@@ -309,7 +328,7 @@ def _semantic_errors(payload: object) -> list[str]:
             if bound_hash != evidence_hash:
                 errors.append(f"{path}: source hash mismatch")
 
-    _check_trace(payload, errors)
+    _check_trace(payload, errors, preflight=preflight)
     return errors
 
 
@@ -372,9 +391,13 @@ def _check_study_scope(
     incomplete_study = manifest.get("complete") is not True or screenshot_ct
     scope = payload.get("assessment_scope")
     if screenshot_ct and scope != "single_image_observation":
-        errors.append("assessment_scope: CT screenshot must be a single-image observation")
+        errors.append(
+            "assessment_scope: CT screenshot must be a single-image observation"
+        )
     elif incomplete_study and scope == "complete_study":
-        errors.append("assessment_scope: incomplete inputs cannot represent a complete study")
+        errors.append(
+            "assessment_scope: incomplete inputs cannot represent a complete study"
+        )
     elif not incomplete_study and scope != "complete_study":
         errors.append("assessment_scope: a complete manifest must use complete_study")
     if screenshot_ct and manifest.get("complete") is True:
@@ -404,7 +427,9 @@ def _check_study_scope(
     if not incomplete_study:
         return
     image_quality = payload.get("image_quality")
-    adequacy = image_quality.get("adequacy") if isinstance(image_quality, dict) else None
+    adequacy = (
+        image_quality.get("adequacy") if isinstance(image_quality, dict) else None
+    )
     issues = image_quality.get("issues") if isinstance(image_quality, dict) else None
     if adequacy == "diagnostic":
         errors.append("image_quality: incomplete study cannot be diagnostic")
@@ -416,7 +441,9 @@ def _check_study_scope(
         errors.append("study_manifest: incomplete study must state limitations")
 
 
-def _check_trace(payload: dict[str, Any], errors: list[str]) -> None:
+def _check_trace(
+    payload: dict[str, Any], errors: list[str], *, preflight: bool = False
+) -> None:
     trace = payload.get("analysis_trace")
     if not isinstance(trace, list):
         return
@@ -427,7 +454,9 @@ def _check_trace(payload: dict[str, Any], errors: list[str]) -> None:
     ]
     if len(stages) != len(set(stages)):
         errors.append("analysis_trace: workflow stages must be unique")
-    missing = sorted(_REQUIRED_TRACE_STAGES - set(stages))
+    future = {"contract_validation", "human_handoff"}
+    required = _REQUIRED_TRACE_STAGES - future if preflight else _REQUIRED_TRACE_STAGES
+    missing = sorted(required - set(stages))
     if missing:
         errors.append("analysis_trace: missing required stages: " + ", ".join(missing))
     order = [_TRACE_ORDER[stage] for stage in stages if stage in _TRACE_ORDER]
@@ -438,7 +467,14 @@ def _check_trace(payload: dict[str, Any], errors: list[str]) -> None:
         for event in trace
         if isinstance(event, dict) and isinstance(event.get("stage"), str)
     }
-    for stage in {"intake", "quality_gate", "contract_validation", "human_handoff"}:
+    if preflight and future.intersection(stages):
+        errors.append("analysis_trace: preflight cannot claim validation or handoff")
+    if preflight and any(event.get("status") == "failed" for event in events.values()):
+        errors.append("analysis_trace: failed workflow cannot enter preflight")
+    completed = {"intake", "quality_gate"}
+    if not preflight:
+        completed |= future
+    for stage in completed:
         if events.get(stage, {}).get("status") != "completed":
             errors.append(f"analysis_trace: {stage} must be completed")
     diagnostic = (
@@ -449,9 +485,10 @@ def _check_trace(payload: dict[str, Any], errors: list[str]) -> None:
         for stage in {"blind_pass", "reconcile"}:
             if events.get(stage, {}).get("status") != "completed":
                 errors.append(f"analysis_trace: {stage} must be completed")
-    if events.get("independent_evidence", {}).get("status") == "completed" and events.get(
-        "blind_pass", {}
-    ).get("status") != "completed":
+    if (
+        events.get("independent_evidence", {}).get("status") == "completed"
+        and events.get("blind_pass", {}).get("status") != "completed"
+    ):
         errors.append("analysis_trace: tools cannot precede a completed blind pass")
 
 

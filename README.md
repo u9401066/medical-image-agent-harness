@@ -89,6 +89,13 @@ ledger, ordered workflow events, assessment scope, and human-review disposition,
 then call `AnalysisResult.to_contract_payload()`. That method invokes the canonical
 schema and semantic validator and fails closed when any binding is absent.
 
+Hosts that validate content before making it available for review can use the
+separate `schema.preflight_validation_errors(payload)` API. It checks the same
+content against an executed prefix and forbids future validation/handoff events.
+It is not canonical acceptance: the normal serializer/CLI still require real
+completed validation and handoff records. See the
+[preflight boundary](.agents/skills/medical-image-reading/references/output-contract.md#preflight-before-actual-human-handoff).
+
 See [Methodology](docs/METHODOLOGY.md), [integration boundary](docs/INTEGRATION.md),
 the [bounded multi-pass engine and host policy](docs/MULTIPASS.md),
 and [prior-art/license research](docs/PRIOR_ART.md).
