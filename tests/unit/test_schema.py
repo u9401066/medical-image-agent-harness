@@ -22,6 +22,80 @@ from medical_image_harness.schema import validation_errors
 from medical_image_harness.study import ImageAsset, StudyManifest
 
 SOURCE_HASH = "a" * 64
+
+
+def test_checklist_multiple_observations_are_preserved_without_mutation():
+    payload = _payload()
+    payload["observations"].append({**payload["observations"][0], "id": "o2"})
+    item = payload["checklist"]["lungs"]
+    item.pop("evidence")
+    item["observation_ids"] = ["o1", "o2"]
+    original = deepcopy(payload)
+    assert validation_errors(payload) == []
+    assert payload == original
+
+
+@pytest.mark.parametrize(
+    "refs", [[], ["o1", "missing"], ["o1", "o1"], ["o1, o2"], [""], [1], "o1", None]
+)
+def test_checklist_rejects_invalid_structured_references(refs):
+    payload = _payload()
+    item = payload["checklist"]["lungs"]
+    item.pop("evidence")
+    item["observation_ids"] = refs
+    assert validation_errors(payload)
+
+
+@pytest.mark.parametrize("legacy", ["o1", "missing", "o1, o2"])
+def test_checklist_rejects_two_nonempty_reference_representations(legacy):
+    payload = _payload()
+    payload["checklist"]["lungs"].update(evidence=legacy, observation_ids=["o1"])
+    assert validation_errors(payload)
+
+
+@pytest.mark.parametrize("structured", [False, True])
+@pytest.mark.parametrize(
+    "status,assessable",
+    [("contradicted", True), ("unevaluable", True), ("supported", False)],
+)
+def test_assessable_checklist_rejects_any_unsupported_observation(
+    structured, status, assessable
+):
+    payload = _payload()
+    payload["observations"].append(
+        {
+            **payload["observations"][0],
+            "id": "o2",
+            "status": status,
+            "assessable": assessable,
+        }
+    )
+    item = payload["checklist"]["lungs"]
+    if structured:
+        item.pop("evidence")
+        item["observation_ids"] = ["o1", "o2"]
+    else:
+        item["evidence"] = "o2"
+    assert any("checklist/lungs" in error for error in validation_errors(payload))
+
+
+def test_typed_checklist_serializes_all_references():
+    result = AnalysisResult(
+        Modality.CXR,
+        "synthetic",
+        Severity.INFO,
+        [],
+        {
+            "lungs": ChecklistItem(
+                "synthetic", Severity.INFO, observation_ids=["o1", "o2"]
+            )
+        },
+    )
+    item = result.to_contract_payload(validate=False)["checklist"]["lungs"]
+    assert item["observation_ids"] == ["o1", "o2"]
+    assert "evidence" not in item
+
+
 CXR_CHECKLIST = {
     "projection_quality",
     "airway",
@@ -283,7 +357,9 @@ def test_finding_bbox_requires_binding_and_matching_evidence() -> None:
 
     errors = validation_errors(payload)
 
-    assert any("findings/f1/bboxes/0: box exceeds source bounds" in error for error in errors)
+    assert any(
+        "findings/f1/bboxes/0: box exceeds source bounds" in error for error in errors
+    )
     assert any("box is not present in linked evidence" in error for error in errors)
 
 
@@ -293,7 +369,9 @@ def test_finding_bbox_source_hash_is_required() -> None:
 
     errors = validation_errors(payload)
 
-    assert any("source_image_sha256" in error and "required" in error for error in errors)
+    assert any(
+        "source_image_sha256" in error and "required" in error for error in errors
+    )
 
 
 def test_single_ct_screenshot_cannot_claim_complete_diagnostic_read() -> None:
@@ -327,7 +405,9 @@ def test_single_ct_screenshot_cannot_claim_complete_diagnostic_read() -> None:
 
     errors = validation_errors(payload)
 
-    assert any("CT screenshot must be a single-image observation" in error for error in errors)
+    assert any(
+        "CT screenshot must be a single-image observation" in error for error in errors
+    )
     assert any("CT screenshot cannot be a complete study" in error for error in errors)
     assert any("incomplete study cannot be diagnostic" in error for error in errors)
     assert any("incomplete study must fail closed" in error for error in errors)
@@ -336,7 +416,9 @@ def test_single_ct_screenshot_cannot_claim_complete_diagnostic_read() -> None:
     assert any("cannot carry high diagnostic confidence" in error for error in errors)
 
 
-def test_limited_ct_screenshot_rejects_diagnostic_claim_type_and_high_confidence() -> None:
+def test_limited_ct_screenshot_rejects_diagnostic_claim_type_and_high_confidence() -> (
+    None
+):
     payload = _ct_screenshot_payload()
     assert validation_errors(payload) == []
     payload["summary"] = "Definite acute intracranial hemorrhage."
@@ -346,7 +428,9 @@ def test_limited_ct_screenshot_rejects_diagnostic_claim_type_and_high_confidence
 
     errors = validation_errors(payload)
 
-    assert sum("permits only descriptive observations" in error for error in errors) == 2
+    assert (
+        sum("permits only descriptive observations" in error for error in errors) == 2
+    )
     assert any("cannot carry high diagnostic confidence" in error for error in errors)
 
 
@@ -374,7 +458,9 @@ def test_trace_must_be_unique_ordered_and_blind_before_tools() -> None:
     errors = validation_errors(payload)
 
     assert any("workflow stages are out of order" in error for error in errors)
-    assert any("tools cannot precede a completed blind pass" in error for error in errors)
+    assert any(
+        "tools cannot precede a completed blind pass" in error for error in errors
+    )
 
 
 def test_non_finite_bbox_coordinates_fail_closed() -> None:

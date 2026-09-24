@@ -103,12 +103,19 @@ class Finding:
 
 @dataclass(frozen=True)
 class ChecklistItem:
-    """One observation axis in a modality-specific systematic read."""
+    """One axis, with structured observation references for scientific reads.
+
+    ``evidence`` retains the legacy single-ID representation (or legacy display
+    text outside the scientific contract). Do not comma-join IDs into that field
+    or provide both nonempty representations. Canonical validation checks every
+    reference; construction alone is not scientific acceptance.
+    """
 
     value: str
     status: Severity
     assessable: bool = True
     evidence: str = ""
+    observation_ids: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -201,6 +208,11 @@ class AnalysisResult:
                     "status": item.status.value,
                     "assessable": item.assessable,
                     **({"evidence": item.evidence} if item.evidence else {}),
+                    **(
+                        {"observation_ids": list(item.observation_ids)}
+                        if item.observation_ids
+                        else {}
+                    ),
                 }
                 for key, item in self.checklist.items()
             },

@@ -89,6 +89,14 @@ ledger, ordered workflow events, assessment scope, and human-review disposition,
 then call `AnalysisResult.to_contract_payload()`. That method invokes the canonical
 schema and semantic validator and fails closed when any binding is absent.
 
+Scientific checklist items support one or more exact `observation_ids`, for
+example `["o1", "o2"]`. Every reference is checked; assessable items cannot cite
+contradicted or unevaluable observations. Legacy single-ID `evidence` remains
+accepted, but comma-joined IDs and simultaneous nonempty reference fields are
+rejected, never silently repaired. This additive contract extension is identified
+by the pinned harness revision; readers pinned to earlier revisions may reject
+the new field. See the [output contract](.agents/skills/medical-image-reading/references/output-contract.md).
+
 Hosts that validate content before making it available for review can use the
 separate `schema.preflight_validation_errors(payload)` API. It checks the same
 content against an executed prefix and forbids future validation/handoff events.

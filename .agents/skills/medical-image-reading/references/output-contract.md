@@ -41,6 +41,13 @@ Contract rules that require semantic validation in addition to JSON Schema:
    handoff events are unique and ordered; optional tools cannot precede blind read.
 10. Impression claims cite verified observation IDs; unsupported tool output cannot
    enter the impression.
+11. Checklist items use `observation_ids: ["o1", "o2"]` for one or multiple
+    supporting observations. Every reference resolves; for assessable items every
+    observation is assessable and `supported` or `possible`. Empty references are
+    allowed only for unassessable items. The legacy `evidence` string remains a
+    single exact ID for assessable items, never a comma-separated list. Do not
+    supply both nonempty reference representations. Validators never split,
+    repair, drop, or silently choose between model-supplied references.
 
 Use `medical-image-harness validate RESULT.json` for deterministic validation.
 Adapters may add transport envelopes but must not weaken this payload contract.

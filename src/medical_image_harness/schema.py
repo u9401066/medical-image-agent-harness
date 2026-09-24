@@ -147,12 +147,25 @@ def _semantic_errors(payload: object, *, preflight: bool = False) -> list[str]:
     checklist = payload.get("checklist")
     if isinstance(checklist, dict):
         for key, item in checklist.items():
-            if not isinstance(item, dict) or not item.get("assessable"):
+            if not isinstance(item, dict):
                 continue
-            reference = item.get("evidence")
-            if reference not in observation_ids:
+            references = list_value(item.get("observation_ids"))
+            if not references and item.get("assessable"):
+                references = [item.get("evidence")]
+            for reference in references:
+                if not isinstance(reference, str) or reference not in observation_ids:
+                    errors.append(f"checklist/{key}: item lacks a resolved observation")
+                    continue
+                observation = observations[reference]
+                if not item.get("assessable"):
+                    continue
+                if observation.get("assessable") and observation.get("status") in {
+                    "supported",
+                    "possible",
+                }:
+                    continue
                 errors.append(
-                    f"checklist/{key}: assessable item lacks a resolved observation"
+                    f"checklist/{key}: assessable item references an unverified observation"
                 )
 
     for finding in records("findings"):
