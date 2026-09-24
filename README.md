@@ -10,6 +10,16 @@ evidence contract, multi-pass verification loop, safety gates, and evaluation AP
 
 ## Why this exists
 
+`MultiPassInterpreter(..., prefer_ekg_group_coverage=True)` optionally reserves a
+two-crop budget for both observed limb and precordial groups. It requires a complete,
+valid, explicitly labeled 12-lead inventory **before** any layout normalization,
+two bounded group crops, and at least two enabled systematic probes. Existing
+hypotheses can be verified inside those groups; discovery may add source-remapped
+findings. Critical-first triage, waveform/local attention, partial/unknown inputs,
+other modalities and other budgets keep their existing routes. The default is
+off. Coverage is a crop-planning fact, not proof of a complete or correct diagnosis;
+deadlines can still prevent a planned crop from executing. No model call is added.
+
 Vision-capable agents can inspect an image, but a reliable research workflow needs
 more than a prompt. This repository makes the method inspectable and testable:
 
