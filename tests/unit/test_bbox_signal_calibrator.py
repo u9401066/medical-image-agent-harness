@@ -115,8 +115,8 @@ def test_bbox_region_is_reconciled_to_declared_lead_layout() -> None:
     result = _result()
     result.layout = {
         "leads": [
-            {"name": "V4", "bbox": [0.0, 0.5, 1.0, 0.25]},
-            {"name": "V5", "bbox": [0.0, 0.75, 1.0, 0.25]},
+            {"name": "V4", "label_visible": True, "bbox": [0.0, 0.5, 1.0, 0.25]},
+            {"name": "V5", "label_visible": True, "bbox": [0.0, 0.75, 1.0, 0.25]},
         ]
     }
     result.findings[0] = Finding(
